@@ -2,3 +2,4 @@
     openpyxl
     et-xmlfile
     gunicorn
+    fpdf2
