@@ -1,5 +1,7 @@
-    Flask
-    openpyxl
-    et-xmlfile
-    gunicorn
-    fpdf2
+Flask
+openpyxl
+et-xmlfile
+gunicorn
+fpdf2
+pandas
+Pillow
