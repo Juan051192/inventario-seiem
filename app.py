@@ -88,7 +88,7 @@ TODAS = """
 <a href="/mis_movimientos">MIS MOVIMIENTOS</a>
 <a href="/usuarios">USUARIOS</a>
 <a href="/oficinas">OFICINAS</a>
-<a href="/bienes_propios" style="background:#E65100;color:white;padding:4px 10px;border-radius:12px">\U0001F4E6 BIENES PROPIOS</a>
+<a href="/bienes_propios" style="background:#E65100;color:white;padding:4px 10px;border-radius:12px">📦 BIENES PROPIOS</a>
 """
 SOLO_USUARIO = """
 <a href="/reportes">REPORTES</a>
@@ -96,7 +96,7 @@ SOLO_USUARIO = """
 <a href="/cambio_resguardatario">CAMBIO RESGUARDATARIO</a>
 <a href="/bajas">BAJAS</a>
 <a href="/mis_movimientos">MIS MOVIMIENTOS SOLICITADOS</a>
-<a href="/bienes_propios" style="background:#E65100;color:white;padding:4px 10px;border-radius:12px">\U0001F4E6 BIENES PROPIOS</a>
+<a href="/bienes_propios" style="background:#E65100;color:white;padding:4px 10px;border-radius:12px">📦 BIENES PROPIOS</a>
 """
 
 def render_page(content):
@@ -108,10 +108,34 @@ def render_page(content):
     return render_template_string("""
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>SEIEM V14</title>
-<style>body{margin:0;padding:0;box-sizing:border-box;background:#f3f3f0;font-family:Arial}.topbar{background:white;display:flex;justify-content:space-between;padding:10px 15px;border-bottom:4px solid #691C32;position:sticky;top:0;z-index:10;align-items:center}.menu a{margin:0 5px;text-decoration:none;color:#691C32;font-weight:bold;font-size:11px}.userbox{font-size:12px}</style>
+<style>
+body{margin:0;padding:0;box-sizing:border-box;background:#f3f3f0;font-family:Arial;overflow-x:hidden}
+.topbar{background:white;display:flex;justify-content:space-between;padding:10px 15px;border-bottom:4px solid #691C32;position:sticky;top:0;z-index:100;align-items:center;flex-wrap:wrap}
+.menu{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.menu a{margin:0 5px;text-decoration:none;color:#691C32;font-weight:bold;font-size:11px}
+.userbox{font-size:12px;display:flex;align-items:center}
+.hamburger{display:none;font-size:26px;cursor:pointer;background:#691C32;color:white;padding:2px 10px;border-radius:6px;user-select:none}
+@media (max-width: 900px){
+  .hamburger{display:block}
+  .menu{display:none;flex-direction:column;width:100%;background:#fff8f0;padding:10px;margin-top:10px;border-radius:8px;order:4}
+  .menu.active{display:flex}
+  .menu a{width:100%;padding:12px!important;font-size:14px!important;border-bottom:1px solid #eee;box-sizing:border-box}
+  .userbox{width:100%;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #eee}
+  input,select,button,form{max-width:100%!important;box-sizing:border-box}
+}
+</style>
+<script>
+function toggleMenu(){document.getElementById('mainMenu').classList.toggle('active');}
+</script>
 </head><body>
-<div class="topbar"><div><b>SEIEM - PADRON D.E.E.</b></div><div class="menu">"""+menu_html+"""</div><div class="userbox">"""+u+""" | """+ofi+""" <span style="background:#FFD700;color:#691C32;padding:2px 6px;border-radius:8px;margin-left:5px">"""+rol_txt+"""</span> <a href="/logout" style="background:#691C32;color:white;padding:4px 10px;border-radius:8px;text-decoration:none;margin-left:10px;font-weight:bold">SALIR</a></div></div>
+<div class="topbar">
+  <div><b>SEIEM - PADRON D.E.E.</b></div>
+  <div class="hamburger" onclick="toggleMenu()">☰</div>
+  <div class="menu" id="mainMenu">"""+menu_html+"""</div>
+  <div class="userbox">"""+u+""" | """+ofi+""" <span style="background:#FFD700;color:#691C32;padding:2px 6px;border-radius:8px;margin-left:5px">"""+rol_txt+"""</span> <a href="/logout" style="background:#691C32;color:white;padding:4px 10px;border-radius:8px;text-decoration:none;margin-left:10px;font-weight:bold">SALIR</a></div>
+</div>
 <div style="padding:15px;max-width:1150px;margin:auto">"""+content+"""</div></body></html>""")
+
 def solo_admin(f):
     from functools import wraps
     @wraps(f)
@@ -120,9 +144,9 @@ def solo_admin(f):
             return redirect('/reportes')
         return f(*a,**k)
     return deco
-('/')
-def idx(): return redirect('/dashboard') if 'username' in session else redirect('/login')
 
+@app.route('/')
+def idx(): return redirect('/dashboard') if 'username' in session else redirect('/login')
 
 @app.route('/login', methods=['GET','POST'])
 def login():
