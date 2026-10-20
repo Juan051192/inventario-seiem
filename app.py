@@ -243,7 +243,92 @@ def logout(): session.clear();return redirect('/login')
 @app.route('/reportes')
 def reportes():
     if 'username' not in session: return redirect('/login')
-    return redirect('/graficas')
+    import json
+    rol=session.get('rol'); oficina_user=session.get('oficina')
+    oficina_f=request.args.get('oficina','').strip()
+    resg_f=request.args.get('resguardatario','').strip()
+    if rol!='admin': oficina_f=oficina_user
+    db=get_db()
+    where=" WHERE (en_baja=0 OR en_baja IS NULL) "; params=[]
+    if oficina_f: where+=" AND oficina LIKE? "; params.append(f"%{oficina_f}%")
+    if resg_f: where+=" AND resguardatario LIKE? "; params.append(f"%{resg_f}%")
+    total=db.execute(f"SELECT COUNT(*) as c FROM bienes {where}", params).fetchone()['c']
+    bienes=db.execute(f"SELECT * FROM bienes {where} ORDER BY id DESC LIMIT 200", params).fetchall()
+    if rol=='admin':
+        oficinas=db.execute("SELECT DISTINCT oficina FROM bienes WHERE oficina!='' ORDER BY oficina").fetchall()
+        resguardatarios=db.execute("SELECT DISTINCT resguardatario FROM bienes WHERE resguardatario!='' ORDER BY resguardatario").fetchall()
+    else:
+        oficinas=[{'oficina':oficina_user}]
+        resguardatarios=db.execute("SELECT DISTINCT resguardatario FROM bienes WHERE oficina=? ORDER BY resguardatario",(oficina_user,)).fetchall()
+    db.close()
+    ops_ofi=''.join([f"<option value='{o['oficina']}' {'selected' if oficina_f==o['oficina'] else ''}>{clean(o['oficina'])}</option>" for o in oficinas])
+    ops_resg=''.join([f"<option value='{r['resguardatario']}' {'selected' if resg_f==r['resguardatario'] else ''}>{clean(r['resguardatario'])}</option>" for r in resguardatarios])
+    filas=''.join([f"<tr><td>{b['id']}</td><td>{clean(b['oficina'])}</td><td>{clean(b['resguardatario'])}</td><td>{clean(b['descripcion'])}</td><td>{clean(b['no_inventario'])}</td></tr>" for b in bienes])
+    return render_page(f"""
+    <div style="background:white;padding:15px;border-radius:12px;margin-bottom:15px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <h2 style="color:#691C32">REPORTES - Total {total}</h2>
+        <div style="display:flex;gap:8px">
+          <a href="/reporte_pdf?oficina={oficina_f}&resguardatario={resg_f}" target="_blank" style="background:#212121;color:white;padding:8px 12px;border-radius:6px;text-decoration:none;font-size:12px">PDF</a>
+          <a href="/reporte_excel?oficina={oficina_f}&resguardatario={resg_f}" style="background:#2e7d32;color:white;padding:8px 12px;border-radius:6px;text-decoration:none;font-size:12px">EXCEL</a>
+        </div>
+      </div>
+      <form method="GET" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <select name="oficina" style="flex:1;padding:10px;border-radius:8px;border:2px solid #691C32" {'disabled' if rol!='admin' else ''}><option value="">-- TODAS --</option>{ops_ofi}</select>
+        <select name="resguardatario" style="flex:1;padding:10px;border-radius:8px;border:2px solid #691C32"><option value="">-- TODOS --</option>{ops_resg}</select>
+        <button style="background:#691C32;color:white;border:none;padding:10px 18px;border-radius:8px">FILTRAR</button>
+        <a href="/reportes" style="background:#ddd;padding:10px 15px;border-radius:8px;text-decoration:none;color:black">LIMPIAR</a>
+      </form>
+    </div>
+    <div style="background:white;padding:15px;border-radius:12px;overflow:auto"><table border="1" style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#691C32;color:white"><th>ID</th><th>OFICINA</th><th>RESGUARDATARIO</th><th>DESCRIPCION</th><th>INVENTARIO</th></tr>{filas}</table></div>
+    """)
+
+@app.route('/graficas')
+def graficas():
+    if 'username' not in session: return redirect('/login')
+    import json
+    rol=session.get('rol'); oficina_user=session.get('oficina')
+    oficina_f=request.args.get('oficina','').strip()
+    resg_f=request.args.get('resguardatario','').strip()
+    if rol!='admin': oficina_f=oficina_user
+    db=get_db()
+    where=" WHERE (en_baja=0 OR en_baja IS NULL) "; params=[]
+    if oficina_f: where+=" AND oficina LIKE? "; params.append(f"%{oficina_f}%")
+    if resg_f: where+=" AND resguardatario LIKE? "; params.append(f"%{resg_f}%")
+    total=db.execute(f"SELECT COUNT(*) as c FROM bienes {where}", params).fetchone()['c']
+    por_resg=db.execute(f"SELECT resguardatario, COUNT(*) as cant FROM bienes {where} GROUP BY resguardatario ORDER BY cant DESC LIMIT 10", params).fetchall()
+    por_ofi=db.execute(f"SELECT oficina, COUNT(*) as cant FROM bienes {where} GROUP BY oficina ORDER BY cant DESC LIMIT 10", params).fetchall()
+    if rol=='admin':
+        oficinas=db.execute("SELECT DISTINCT oficina FROM bienes WHERE oficina!='' ORDER BY oficina").fetchall()
+        resguardatarios=db.execute("SELECT DISTINCT resguardatario FROM bienes WHERE resguardatario!='' ORDER BY resguardatario").fetchall()
+    else:
+        oficinas=[{'oficina':oficina_user}]
+        resguardatarios=db.execute("SELECT DISTINCT resguardatario FROM bienes WHERE oficina=? ORDER BY resguardatario",(oficina_user,)).fetchall()
+    db.close()
+    ops_ofi=''.join([f"<option value='{o['oficina']}' {'selected' if oficina_f==o['oficina'] else ''}>{clean(o['oficina'])}</option>" for o in oficinas])
+    ops_resg=''.join([f"<option value='{r['resguardatario']}' {'selected' if resg_f==r['resguardatario'] else ''}>{clean(r['resguardatario'])}</option>" for r in resguardatarios])
+    return render_page(f"""
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <div style="background:white;padding:15px;border-radius:12px;margin-bottom:15px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <h2 style="color:#691C32">GRAFICAS - Total {total}</h2>
+      </div>
+      <form method="GET" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <select name="oficina" style="flex:1;padding:10px;border-radius:8px;border:2px solid #691C32" {'disabled' if rol!='admin' else ''}><option value="">-- TODAS --</option>{ops_ofi}</select>
+        <select name="resguardatario" style="flex:1;padding:10px;border-radius:8px;border:2px solid #691C32"><option value="">-- TODOS --</option>{ops_resg}</select>
+        <button style="background:#691C32;color:white;border:none;padding:10px 18px;border-radius:8px">FILTRAR</button>
+        <a href="/graficas" style="background:#ddd;padding:10px 15px;border-radius:8px;text-decoration:none;color:black">LIMPIAR</a>
+      </form>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+      <div style="background:white;padding:15px;border-radius:12px"><h4>Top 10 Por Resguardatario</h4><canvas id="cResg"></canvas></div>
+      <div style="background:white;padding:15px;border-radius:12px"><h4>Por Oficina</h4><canvas id="cOfi"></canvas></div>
+    </div>
+    <script>
+      new Chart(document.getElementById('cResg'),{{type:'bar',data:{{labels:{json.dumps([clean(r['resguardatario'])[:20] for r in por_resg])},datasets:[{{label:'Bienes',data:{json.dumps([r['cant'] for r in por_resg])},backgroundColor:'#691C32'}}]}}}})
+      new Chart(document.getElementById('cOfi'),{{type:'bar',data:{{labels:{json.dumps([clean(r['oficina'])[:20] for r in por_ofi])},datasets:[{{label:'Bienes',data:{json.dumps([r['cant'] for r in por_ofi])},backgroundColor:'#C9A86A'}}]}}}})
+    </script>
+    """)
 
 @app.route('/mis_movimientos')
 def mis_movimientos_alias():
@@ -456,57 +541,6 @@ def dashboard():
             <div style='background:white;padding:10px;overflow:auto;border-radius:10px'><table style='width:100%;border-collapse:collapse'><tr style='background:#691C32;color:white'><th>Inv</th><th>Bien</th><th>Marca</th><th>Modelo</th><th>Serie</th><th>Oficina</th><th>Resguardatario</th></tr>{filas}</table></div>
         </div>
         """)
-@app.route('/graficas')
-def graficas():
-    if 'username' not in session: return redirect('/login')
-    import json
-    rol=session.get('rol'); oficina_user=session.get('oficina')
-    oficina_f=request.args.get('oficina','').strip()
-    resg_f=request.args.get('resguardatario','').strip()
-    if rol!='admin': oficina_f=oficina_user
-    db=get_db()
-    where=" WHERE (en_baja=0 OR en_baja IS NULL) "; params=[]
-    if oficina_f: where+=" AND oficina LIKE? "; params.append(f"%{oficina_f}%")
-    if resg_f: where+=" AND resguardatario LIKE? "; params.append(f"%{resg_f}%")
-    total=db.execute(f"SELECT COUNT(*) as c FROM bienes {where}", params).fetchone()['c']
-    por_resg=db.execute(f"SELECT resguardatario, COUNT(*) as cant FROM bienes {where} GROUP BY resguardatario ORDER BY cant DESC LIMIT 10", params).fetchall()
-    por_ofi=db.execute(f"SELECT oficina, COUNT(*) as cant FROM bienes {where} GROUP BY oficina ORDER BY cant DESC LIMIT 10", params).fetchall()
-    if rol=='admin':
-        oficinas=db.execute("SELECT DISTINCT oficina FROM bienes WHERE oficina!='' ORDER BY oficina").fetchall()
-        resguardatarios=db.execute("SELECT DISTINCT resguardatario FROM bienes WHERE resguardatario!='' ORDER BY resguardatario").fetchall()
-    else:
-        oficinas=[{'oficina':oficina_user}]
-        resguardatarios=db.execute("SELECT DISTINCT resguardatario FROM bienes WHERE oficina=? ORDER BY resguardatario",(oficina_user,)).fetchall()
-    db.close()
-    ops_ofi=''.join([f"<option value='{o['oficina']}' {'selected' if oficina_f==o['oficina'] else ''}>{clean(o['oficina'])}</option>" for o in oficinas])
-    ops_resg=''.join([f"<option value='{r['resguardatario']}' {'selected' if resg_f==r['resguardatario'] else ''}>{clean(r['resguardatario'])}</option>" for r in resguardatarios])
-    return render_page(f"""
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <div style="background:white;padding:15px;border-radius:12px;margin-bottom:15px">
-      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <h2 style="color:#691C32">REPORTES - Total {total}</h2>
-        <div style="display:flex;gap:8px">
-          <a href="/reporte_pdf?oficina={oficina_f}&resguardatario={resg_f}" target="_blank" style="background:#212121;color:white;padding:8px 12px;border-radius:6px;text-decoration:none;font-size:12px">PDF</a>
-          <a href="/reporte_excel?oficina={oficina_f}&resguardatario={resg_f}" style="background:#2e7d32;color:white;padding:8px 12px;border-radius:6px;text-decoration:none;font-size:12px">EXCEL</a>
-        </div>
-      </div>
-      <form method="GET" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-        <select name="oficina" style="flex:1;padding:10px;border-radius:8px;border:2px solid #691C32" {'disabled' if rol!='admin' else ''}><option value="">-- TODAS --</option>{ops_ofi}</select>
-        <select name="resguardatario" style="flex:1;padding:10px;border-radius:8px;border:2px solid #691C32"><option value="">-- TODOS --</option>{ops_resg}</select>
-        <button style="background:#691C32;color:white;border:none;padding:10px 18px;border-radius:8px">FILTRAR</button>
-        <a href="/graficas" style="background:#ddd;padding:10px 15px;border-radius:8px;text-decoration:none;color:black">LIMPIAR</a>
-      </form>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
-      <div style="background:white;padding:15px;border-radius:12px"><h4>Top 10 Por Resguardatario</h4><canvas id="cResg"></canvas></div>
-      <div style="background:white;padding:15px;border-radius:12px"><h4>Por Oficina</h4><canvas id="cOfi"></canvas></div>
-    </div>
-    <script>
-      new Chart(document.getElementById('cResg'),{{type:'bar',data:{{labels:{json.dumps([clean(r['resguardatario'])[:20] for r in por_resg])},datasets:[{{label:'Bienes',data:{json.dumps([r['cant'] for r in por_resg])},backgroundColor:'#691C32'}}]}}}})
-      new Chart(document.getElementById('cOfi'),{{type:'bar',data:{{labels:{json.dumps([clean(r['oficina'])[:20] for r in por_ofi])},datasets:[{{label:'Bienes',data:{json.dumps([r['cant'] for r in por_ofi])},backgroundColor:'#C9A86A'}}]}}}})
-    </script>
-    """)
-
 @app.route('/reporte_pdf')
 def reporte_pdf():
     from flask import send_file
@@ -521,13 +555,19 @@ def reporte_pdf():
 
     oficina = request.args.get('oficina','').strip()
     resguardatario_q = request.args.get('resguardatario','').strip()
+    rol=session.get('rol'); oficina_user=session.get('oficina')
 
     db = get_db()
-    if resguardatario_q and resguardatario_q.upper() != "TODOS":
-        bienes = db.execute("SELECT * FROM bienes WHERE oficina=? AND resguardatario=? ORDER BY resguardatario", (oficina, resguardatario_q)).fetchall()
+    where=" WHERE (en_baja=0 OR en_baja IS NULL) "; params=[]
+    if rol!='admin': 
+        where+=" AND oficina=? "; params.append(oficina_user)
     else:
-        bienes = db.execute("SELECT * FROM bienes WHERE oficina=? ORDER BY resguardatario", (oficina,)).fetchall()
-        resguardatario_q = ""
+        if oficina: 
+            where+=" AND oficina LIKE ? "; params.append(f"%{oficina}%")
+    if resguardatario_q and resguardatario_q.upper()!="TODOS":
+        where+=" AND resguardatario LIKE ? "; params.append(f"%{resguardatario_q}%")
+    
+    bienes = db.execute(f"SELECT * FROM bienes {where} ORDER BY resguardatario, id DESC", params).fetchall()
     db.close()
 
     def limpia(v):
@@ -535,8 +575,13 @@ def reporte_pdf():
         s=str(v).strip()
         if s.lower() in ["nan","none","nat","null",""]: return ""
         return s
+    
+    def safe(b, *nombres):
+        k=b.keys()
+        for n in nombres:
+            if n in k and limpia(b[n]): return limpia(b[n])
+        return ""
 
-    # --- ESTILOS QUE SE AUTO-AJUSTAN ---
     style_head = ParagraphStyle('head', fontName='Helvetica-Bold', fontSize=6, leading=7, alignment=TA_CENTER, textColor=colors.white)
     style_cell = ParagraphStyle('cell', fontName='Helvetica', fontSize=6.5, leading=7.5, alignment=TA_CENTER, wordWrap='CJK')
     style_cell_small = ParagraphStyle('cell_small', fontName='Helvetica', fontSize=5, leading=5.5, alignment=TA_CENTER, wordWrap='CJK')
@@ -545,82 +590,71 @@ def reporte_pdf():
     def Celda(texto, es_header=False, es_desc=False):
         t = escape(limpia(texto))
         if not t: return Paragraph("", style_cell)
-        if es_header:
-            return Paragraph(t, style_head)
-        # Si es muy largo, usa estilo mas chico y que lo parta
-        if len(t) > 30 or es_desc:
-            return Paragraph(t, style_desc if es_desc else style_cell_small)
-        if len(t) > 18:
-            return Paragraph(t, style_cell_small)
+        if es_header: return Paragraph(t, style_head)
+        if len(t) > 30 or es_desc: return Paragraph(t, style_desc if es_desc else style_cell_small)
+        if len(t) > 18: return Paragraph(t, style_cell_small)
         return Paragraph(t, style_cell)
 
     from reportlab.pdfgen import canvas
-    from xml.sax.saxutils import escape
-
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     w, h = letter
 
-    # Encabezado
     c.setFont("Helvetica-Bold", 8)
     c.setFillColor(colors.HexColor("#691C32"))
-    c.drawCentredString(w/2, h-60, "SERVICIOS EDUCATIVOS INTEGRADOS AL ESTADO DE MEXICO")
+    c.drawCentredString(w/2, h-40, "SERVICIOS EDUCATIVOS INTEGRADOS AL ESTADO DE MEXICO")
     c.setFillColor(colors.black)
     c.setFont("Helvetica", 8)
-    c.drawString(80, h-80, f"REPORTE DE BIENES - {limpia(oficina)}")
-    c.drawString(80, h-95, f"FECHA: {datetime.date.today().strftime('%d/%m/%Y')}  TOTAL: {len(bienes)} bienes")
-    c.drawString(80, h-110, f"OFICINA: {limpia(oficina)}")
-    y = h-125
+    c.drawString(40, h-60, f"REPORTE DE BIENES - {limpia(oficina) if oficina else 'TODAS LAS OFICINAS'}")
+    c.drawString(40, h-75, f"FECHA: {datetime.date.today().strftime('%d/%m/%Y')}  TOTAL: {len(bienes)} bienes")
+    y = h-95
     if resguardatario_q:
         c.setFont("Helvetica-Bold", 8)
-        c.drawString(80, y, f"RESGUARDATARIO: {limpia(resguardatario_q)}")
+        c.drawString(40, y, f"RESGUARDATARIO: {limpia(resguardatario_q)}")
         y -= 15
-
-    grupos = defaultdict(list)
-    for b in bienes:
-        grupos[limpia(b["resguardatario"])].append(b)
-
     y -= 10
-    for nombre_resguardo, lista in grupos.items():
-        if y < 150:
-            c.showPage()
-            y = h-60
-        c.setFont("Helvetica-Bold", 7)
-        c.setFillColor(colors.HexColor("#691C32"))
-        c.drawString(40, y, f"RESGUARDATARIO: {nombre_resguardo} - {len(lista)} bienes")
-        y -= 12
 
-        data = [[Celda("INVENTARIO",True), Celda("BIEN / DESCRIPCION",True), Celda("MARCA",True), Celda("MODELO",True), Celda("SERIE",True)]]
-        for b in lista:
-            k=b.keys()
-            inv=limpia(b["inventario"] if "inventario" in k else b["no_inventario"] if "no_inventario" in k else "")
-            desc=limpia(b["descripcion"] if "descripcion" in k else b["nombre"] if "nombre" in k else "")
-            marca=limpia(b["marca"])
-            modelo=limpia(b["modelo"])
-            serie=limpia(b["serie"])
-            data.append([Celda(inv), Celda(desc, es_desc=True), Celda(marca), Celda(modelo), Celda(serie)])
+    if not bienes:
+        c.setFont("Helvetica", 10)
+        c.drawString(40, y, "No se encontraron bienes con ese filtro.")
+    else:
+        grupos = defaultdict(list)
+        for b in bienes:
+            grupos[safe(b,"resguardatario") or "SIN RESGUARDATARIO"].append(b)
 
-        # Columna SERIE mas ancha para que no se corte
-        table = Table(data, colWidths=[55, 170, 55, 55, 115], repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#691C32")),
-            ('BACKGROUND', (0,1), (-1,-1), colors.white),
-            ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#aaa")),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ]))
-        tw, th = table.wrap(0,0)
-        if y - th < 40:
-            c.showPage()
-            y = h-60
-        table.drawOn(c, 40, y-th)
-        y = y-th-20
+        for nombre_resguardo, lista in grupos.items():
+            if y < 150:
+                c.showPage(); y = h-40
+            c.setFont("Helvetica-Bold", 7)
+            c.setFillColor(colors.HexColor("#691C32"))
+            c.drawString(40, y, f"RESGUARDATARIO: {nombre_resguardo} - {len(lista)} bienes")
+            y -= 12
 
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return send_file(buffer, as_attachment=False, mimetype='application/pdf')
+            data = [[Celda("INVENTARIO",True), Celda("BIEN / DESCRIPCION",True), Celda("MARCA",True), Celda("MODELO",True), Celda("SERIE",True)]]
+            for b in lista:
+                inv=safe(b,"inventario","no_inventario","num_inventario")
+                desc=safe(b,"descripcion","nombre","bien")
+                marca=safe(b,"marca")
+                modelo=safe(b,"modelo")
+                serie=safe(b,"serie","no_serie")
+                data.append([Celda(inv), Celda(desc, es_desc=True), Celda(marca), Celda(modelo), Celda(serie)])
+
+            table = Table(data, colWidths=[55, 170, 55, 55, 115], repeatRows=1)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#691C32")),
+                ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#aaa")),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('TOPPADDING', (0,0), (-1,-1), 4),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ]))
+            tw, th = table.wrap(0,0)
+            if y - th < 40:
+                c.showPage(); y = h-40
+            table.drawOn(c, 40, y-th)
+            y = y-th-20
+
+    c.showPage(); c.save(); buffer.seek(0)
+    return send_file(buffer, as_attachment=False, download_name=f"reporte_{oficina or 'todas'}.pdf", mimetype='application/pdf')
 @app.route('/reporte_excel')
 def reporte_excel():
     oficina=request.args.get('oficina',''); resg=request.args.get('resguardatario','')
