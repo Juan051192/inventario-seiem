@@ -148,7 +148,7 @@ def login():
     return render_template_string("""
     <div style="min-height:100vh;background:#f6f3f0;display:flex;justify-content:center;align-items:center">
       <div style="background:white;padding:25px;border-radius:15px;box-shadow:0 4px 20px rgba(0,0,0,0.2);width:100%;max-width:380px">
-        <h2 style="color:#691C32;text-align:center">SEIEM - PADRON 737</h2>
+        <h2 style="color:#691C32;text-align:center">SEIEM - PADRON D.E.E.</h2>
         {% if ok %}<p style="background:#e8f5e9;color:#2e7d32;padding:10px;border-radius:8px;text-align:center">¡Registro exitoso! Ya puedes entrar</p>{% endif %}
         <form method="post">
           <input name="username" required placeholder="Usuario" style="width:100%;padding:12px;border:2px solid #691C32;border-radius:8px;margin-bottom:10px">
