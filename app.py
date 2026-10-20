@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS bienes_propios (
 )
 """)
     cur=db.execute("SELECT * FROM usuarios WHERE username='admin'")
-    if not cur.fetchone(): db.execute("INSERT INTO usuarios VALUES (NULL,'admin','admin123','admin','Direccion General')")
+    if not cur.fetchone(): db.execute("INSERT INTO usuarios VALUES (NULL,'JETS','TASJ921105','admin','Direccion General')")
     c=db.execute("SELECT COUNT(*) as c FROM oficinas").fetchone()['c']
     if c==0:
         for o in []:
