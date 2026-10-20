@@ -5,3 +5,4 @@ gunicorn
 fpdf2
 pandas
 Pillow
+python-docx
