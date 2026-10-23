@@ -1309,30 +1309,47 @@ def tarjeta_oficina(oficina):
     bienes=con.execute("SELECT * FROM bienes WHERE oficina=? AND (en_baja=0 OR en_baja IS NULL) ORDER BY resguardatario, no_inventario",(oficina,)).fetchall()
     resgs=con.execute("SELECT DISTINCT resguardatario FROM bienes WHERE oficina=? AND resguardatario!='' ORDER BY resguardatario",(oficina,)).fetchall()
     con.close()
+
+    def L(v):
+        if v is None: return ""
+        s=str(v).strip()
+        if s.lower() in ["nan","none","nat","null","n/a",""]: return ""
+        return s
+
     pdf=FPDF(format='Letter'); pdf.set_auto_page_break(auto=True, margin=32); pdf.set_margins(12,12,12)
+    
+    # --- FIX: 5 columnas, sin ESTADO y con mas ancho para SERIE ---
+    w=[30, 70, 28, 28, 36]  # 30+70+28+28+36 = 192 (ancho útil de la hoja)
+    
     for idx, r in enumerate(resgs):
         nombre=r['resguardatario']
         lista=[b for b in bienes if b['resguardatario']==nombre]
         if not lista: continue
         pdf.add_page(); header_oficial(pdf, f"RESGUARDO POR OFICINA - {oficina}")
         pdf.set_font("Arial","B",11); pdf.set_text_color(105,28,50); pdf.cell(0,8, L(f"{idx+1}. {nombre} - {len(lista)} bienes"), ln=True); pdf.ln(2)
-        w=[28,62,22,22,28,24]
-        pdf.set_font("Arial","B",8); pdf.set_fill_color(105,28,50); pdf.set_text_color(255,255,255)
-        for i,h in enumerate(["INVENTARIO","DESCRIPCION","MARCA","MODELO","SERIE"]): pdf.cell(w[i],8,h,1,0,'C',True)
+        
+        pdf.set_font("Arial","B",7); pdf.set_fill_color(105,28,50); pdf.set_text_color(255,255,255)
+        for i,h in enumerate(["INVENTARIO","DESCRIPCION","MARCA","MODELO","SERIE"]): 
+            pdf.cell(w[i],8,h,1,0,'C',True)
         pdf.ln()
-        pdf.set_font("Arial","",7)
+        pdf.set_font("Arial","",6.5)
         pdf.set_text_color(0,0,0)
         for i, b in enumerate(lista):
             if i % 2 == 0:
                 pdf.set_fill_color(255,255,255)
             else:
                 pdf.set_fill_color(241,232,234)
+            
+            # quebrar serie larga si tiene mas de 18 caracteres
+            serie_txt = L(b['serie'])
+            if len(serie_txt) > 18:
+                serie_txt = serie_txt[:18]
+
             pdf.cell(w[0],6, L(b['no_inventario'])[:18],1,0,'C',True)
-            pdf.cell(w[1],6, L(b['descripcion'])[:38],1,0,'L',True)
-            pdf.cell(w[2],6, L(b['marca'])[:13],1,0,'C',True)
-            pdf.cell(w[3],6, L(b['modelo'])[:13],1,0,'C',True)
-            pdf.cell(w[4],6, L(b['serie'])[:16],1,0,'C',True)
-            pdf.cell(w[5],6, L(b['estado'])[:14],1,1,'C',True)
+            pdf.cell(w[1],6, L(b['descripcion'])[:42],1,0,'L',True)
+            pdf.cell(w[2],6, L(b['marca'])[:15],1,0,'C',True)
+            pdf.cell(w[3],6, L(b['modelo'])[:15],1,0,'C',True)
+            pdf.cell(w[4],6, serie_txt,1,1,'C',True) # <-- ahora termina aqui, sin w[5]
         footer_firma(pdf, nombre)
     out=io.BytesIO(); pdf.output(out); out.seek(0)
     return send_file(out, download_name=f"Resguardos_{oficina}.pdf", as_attachment=False, mimetype='application/pdf')
