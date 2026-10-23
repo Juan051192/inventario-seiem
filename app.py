@@ -1318,7 +1318,7 @@ def tarjeta_oficina(oficina):
         pdf.set_font("Arial","B",11); pdf.set_text_color(105,28,50); pdf.cell(0,8, L(f"{idx+1}. {nombre} - {len(lista)} bienes"), ln=True); pdf.ln(2)
         w=[28,62,22,22,28,24]
         pdf.set_font("Arial","B",8); pdf.set_fill_color(105,28,50); pdf.set_text_color(255,255,255)
-        for i,h in enumerate(["INVENTARIO","DESCRIPCION","MARCA","MODELO","SERIE","ESTADO"]): pdf.cell(w[i],8,h,1,0,'C',True)
+        for i,h in enumerate(["INVENTARIO","DESCRIPCION","MARCA","MODELO","SERIE"]): pdf.cell(w[i],8,h,1,0,'C',True)
         pdf.ln()
         pdf.set_font("Arial","",7)
         pdf.set_text_color(0,0,0)
