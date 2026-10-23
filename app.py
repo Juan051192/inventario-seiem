@@ -1229,8 +1229,24 @@ def tarjeta(resguardatario):
     def limpia(v):
         if v is None: return ""
         s=str(v).strip()
-        if s.lower() in ["nan","none","nat","null"]: return ""
+        if s.lower() in ["nan","none","nat","null","n/a"]: return ""
         return s
+
+    # Estilos que si permiten cortar
+    style_cell = ParagraphStyle('cell', fontName='Helvetica', fontSize=6, leading=8, alignment=1, wordWrap='CJK', splitLongWords=1, breakLongWords=1)
+    style_head = ParagraphStyle('head', fontName='Helvetica-Bold', fontSize=6.5, leading=8, alignment=1, textColor=colors.white)
+
+    def quebrar_serie(s):
+        txt = limpia(s)
+        if not txt: 
+            return Paragraph("", style_cell)
+        # Si es largo, lo partimos manualmente cada 10 caracteres
+        if len(txt) > 12:
+            t = ""
+            for i in range(0, len(txt), 10):
+                t += txt[i:i+10] + "<br/>"
+            return Paragraph(t, style_cell)
+        return Paragraph(txt, style_cell)
 
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
@@ -1243,59 +1259,46 @@ def tarjeta(resguardatario):
     c.drawCentredString(w/2, h-35, "SERVICIOS EDUCATIVOS INTEGRADOS AL ESTADO DE MEXICO")
     c.setFont("Helvetica", 8)
     c.drawCentredString(w/2, h-50, "RESGUARDO INDIVIDUAL - Recursos Materiales y Financieros")
-
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 9)
     c.drawString(40, h-110, f"Resguardatario: {resguardatario}")
     c.setFont("Helvetica-Bold", 8)
     c.drawString(40, h-125, f"Oficina: Recursos Materiales y Financieros | Total: {len(bienes)} bienes")
 
-    # --- FIX PARA QUE SERIE NO SE SALGA ---
-    style_cell = ParagraphStyle('cell', fontName='Helvetica', fontSize=6.5, leading=7, alignment=1, wordWrap='CJK')
-    style_cell_left = ParagraphStyle('cell_left', fontName='Helvetica', fontSize=6.5, leading=7, alignment=0, wordWrap='CJK')
+    # CABECERA
+    data = [[Paragraph(x, style_head) for x in ["INVENTARIO","DESCRIPCION","MARCA","MODELO","SERIE","ESTADO"]]]
 
-    def p(txt, left=False):
-        # Convierte texto en parrafo que SI se corta
-        return Paragraph(limpia(txt), style_cell_left if left else style_cell)
-
-    data = [[p("INVENTARIO"), p("DESCRIPCION"), p("MARCA"), p("MODELO"), p("SERIE"), p("ESTADO")]]
     for b in bienes:
         data.append([
-            p(b["no_inventario"]),
-            p(b["descripcion"][:50], left=True), # descripcion a la izquierda
-            p(b["marca"]),
-            p(b["modelo"]),
-            p(b["serie"]), # <-- ESTA AHORA SI SE VA A CORTAR EN 2 LINEAS
-            p("")
+            Paragraph(limpia(b["no_inventario"]), style_cell),
+            Paragraph(limpia(b["descripcion"])[:45], style_cell),
+            Paragraph(limpia(b["marca"]), style_cell),
+            Paragraph(limpia(b["modelo"])[:18], style_cell),
+            quebrar_serie(b["serie"]), # <--- FIX
+            Paragraph("", style_cell)
         ])
 
-    col_widths = [65, 150, 50, 60, 110, 45] # le di mas ancho a SERIE: de 70 a 110
+    col_widths = [60, 135, 55, 65, 80, 45]
     table = Table(data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#691C32")),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 7),
-        ('FONTSIZE', (0,1), (-1,-1), 6.5),
-        ('BACKGROUND', (0,1), (-1,-1), colors.white),
-        ('TEXTCOLOR', (0,1), (-1,-1), colors.black),
         ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f9f9f9")]),
+        ('BACKGROUND', (0,1), (-1,-1), colors.white),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('LEFTPADDING', (0,0), (-1,-1), 3),
-        ('RIGHTPADDING', (0,0), (-1,-1), 3),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f5f5f5")]),
+        ('LEFTPADDING', (0,0), (-1,-1), 2),
+        ('RIGHTPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
     ]))
 
     tw, th = table.wrap(0,0)
-    # Si la tabla es muy grande, que no se salga de la hoja
-    if h-140-th < 100:
-        th = h-240
     table.drawOn(c, 40, h-140-th)
 
     y_firma = h-160-th-40
     c.line(50, y_firma-30, 250, y_firma-30)
-    c.drawCentredString(150, y_firma-40, resguardatario)
+    c.drawCentredString(150, y_firma-40, resguardatario[:35])
     c.line(300, y_firma-30, 500, y_firma-30)
     c.drawCentredString(400, y_firma-40, "JEFE DE OFICINA / Vo.Bo.")
     c.setFont("Helvetica", 5)
