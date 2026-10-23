@@ -1232,19 +1232,16 @@ def tarjeta(resguardatario):
         if s.lower() in ["nan","none","nat","null","n/a"]: return ""
         return s
 
-    # Estilos que si permiten cortar
-    style_cell = ParagraphStyle('cell', fontName='Helvetica', fontSize=6, leading=8, alignment=1, wordWrap='CJK', splitLongWords=1, breakLongWords=1)
-    style_head = ParagraphStyle('head', fontName='Helvetica-Bold', fontSize=6.5, leading=8, alignment=1, textColor=colors.white)
+    style_cell = ParagraphStyle('cell', fontName='Helvetica', fontSize=6.5, leading=8, alignment=1, wordWrap='CJK', splitLongWords=1, breakLongWords=1)
+    style_head = ParagraphStyle('head', fontName='Helvetica-Bold', fontSize=7, leading=9, alignment=1, textColor=colors.white)
 
     def quebrar_serie(s):
         txt = limpia(s)
-        if not txt: 
-            return Paragraph("", style_cell)
-        # Si es largo, lo partimos manualmente cada 10 caracteres
-        if len(txt) > 12:
+        if not txt: return Paragraph("", style_cell)
+        if len(txt) > 13:
             t = ""
-            for i in range(0, len(txt), 10):
-                t += txt[i:i+10] + "<br/>"
+            for i in range(0, len(txt), 11):
+                t += txt[i:i+11] + "<br/>"
             return Paragraph(t, style_cell)
         return Paragraph(txt, style_cell)
 
@@ -1259,38 +1256,35 @@ def tarjeta(resguardatario):
     c.drawCentredString(w/2, h-35, "SERVICIOS EDUCATIVOS INTEGRADOS AL ESTADO DE MEXICO")
     c.setFont("Helvetica", 8)
     c.drawCentredString(w/2, h-50, "RESGUARDO INDIVIDUAL - Recursos Materiales y Financieros")
+    
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 9)
     c.drawString(40, h-110, f"Resguardatario: {resguardatario}")
     c.setFont("Helvetica-Bold", 8)
     c.drawString(40, h-125, f"Oficina: Recursos Materiales y Financieros | Total: {len(bienes)} bienes")
 
-    # CABECERA
-    data = [[Paragraph(x, style_head) for x in ["INVENTARIO","DESCRIPCION","MARCA","MODELO","SERIE","ESTADO"]]]
-
+    # --- SIN COLUMNA ESTADO ---
+    data = [[Paragraph(x, style_head) for x in ["INVENTARIO","DESCRIPCION","MARCA","MODELO","SERIE"]]]
     for b in bienes:
         data.append([
             Paragraph(limpia(b["no_inventario"]), style_cell),
-            Paragraph(limpia(b["descripcion"])[:45], style_cell),
+            Paragraph(limpia(b["descripcion"])[:50], style_cell),
             Paragraph(limpia(b["marca"]), style_cell),
-            Paragraph(limpia(b["modelo"])[:18], style_cell),
-            quebrar_serie(b["serie"]), # <--- FIX
-            Paragraph("", style_cell)
+            Paragraph(limpia(b["modelo"]), style_cell),
+            quebrar_serie(b["serie"]),
         ])
 
-    col_widths = [60, 135, 55, 65, 80, 45]
+    # Ahora con mas espacio para SERIE al quitar ESTADO
+    col_widths = [70, 165, 65, 70, 95] 
     table = Table(data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#691C32")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
         ('GRID', (0,0), (-1,-1), 0.5, colors.black),
         ('BACKGROUND', (0,1), (-1,-1), colors.white),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f5f5f5")]),
-        ('LEFTPADDING', (0,0), (-1,-1), 2),
-        ('RIGHTPADDING', (0,0), (-1,-1), 2),
-        ('TOPPADDING', (0,0), (-1,-1), 3),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f9f9f9")]),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
 
     tw, th = table.wrap(0,0)
@@ -1302,7 +1296,7 @@ def tarjeta(resguardatario):
     c.line(300, y_firma-30, 500, y_firma-30)
     c.drawCentredString(400, y_firma-40, "JEFE DE OFICINA / Vo.Bo.")
     c.setFont("Helvetica", 5)
-    c.drawCentredString(w/2, y_firma-50, f"Fecha: {datetime.date.today().strftime('%d/%m/%Y')} - Pag 1")
+    c.drawCentredString(w/2, y_firma-50, f"Fecha: {datetime.date.today().strftime('%d/%m/%Y')}")
     c.showPage()
     c.save()
     buffer.seek(0)
