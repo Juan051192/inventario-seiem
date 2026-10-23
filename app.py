@@ -1218,15 +1218,14 @@ def tarjeta(resguardatario):
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
     from reportlab.lib import colors
-    from reportlab.platypus import Table, TableStyle
-    from reportlab.lib.units import inch
-    import io, os, datetime
+    from reportlab.platypus import Table, TableStyle, Paragraph
+    from reportlab.lib.styles import ParagraphStyle
+    import io, datetime
 
     db = get_db()
     bienes = db.execute("SELECT * FROM bienes WHERE resguardatario=? ORDER BY no_inventario", (resguardatario,)).fetchall()
     db.close()
 
-    # Limpiar nan
     def limpia(v):
         if v is None: return ""
         s=str(v).strip()
@@ -1237,7 +1236,6 @@ def tarjeta(resguardatario):
     c = canvas.Canvas(buffer, pagesize=letter)
     w, h = letter
 
-    # Encabezado guinda solo arriba
     c.setFillColor(colors.HexColor("#691C32"))
     c.rect(0, h-90, w, 90, fill=1, stroke=0)
     c.setFillColor(colors.white)
@@ -1246,27 +1244,33 @@ def tarjeta(resguardatario):
     c.setFont("Helvetica", 8)
     c.drawCentredString(w/2, h-50, "RESGUARDO INDIVIDUAL - Recursos Materiales y Financieros")
 
-    # Datos
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 9)
     c.drawString(40, h-110, f"Resguardatario: {resguardatario}")
     c.setFont("Helvetica-Bold", 8)
     c.drawString(40, h-125, f"Oficina: Recursos Materiales y Financieros | Total: {len(bienes)} bienes")
 
-    # Tabla - SOLO ENCABEZADO EN GUINDA, FILAS EN BLANCO
-    data = [["INVENTARIO","DESCRIPCION","MARCA","MODELO","SERIE","ESTADO"]]
+    # --- FIX PARA QUE SERIE NO SE SALGA ---
+    style_cell = ParagraphStyle('cell', fontName='Helvetica', fontSize=6.5, leading=7, alignment=1, wordWrap='CJK')
+    style_cell_left = ParagraphStyle('cell_left', fontName='Helvetica', fontSize=6.5, leading=7, alignment=0, wordWrap='CJK')
+
+    def p(txt, left=False):
+        # Convierte texto en parrafo que SI se corta
+        return Paragraph(limpia(txt), style_cell_left if left else style_cell)
+
+    data = [[p("INVENTARIO"), p("DESCRIPCION"), p("MARCA"), p("MODELO"), p("SERIE"), p("ESTADO")]]
     for b in bienes:
         data.append([
-            limpia(b["no_inventario"]),
-            limpia(b["descripcion"])[:40],
-            limpia(b["marca"]),
-            limpia(b["modelo"]),
-            limpia(b["serie"]),
-            ""
+            p(b["no_inventario"]),
+            p(b["descripcion"][:50], left=True), # descripcion a la izquierda
+            p(b["marca"]),
+            p(b["modelo"]),
+            p(b["serie"]), # <-- ESTA AHORA SI SE VA A CORTAR EN 2 LINEAS
+            p("")
         ])
 
-    col_widths = [70, 180, 50, 70, 70, 50]
-    table = Table(data, colWidths=col_widths)
+    col_widths = [65, 150, 50, 60, 110, 45] # le di mas ancho a SERIE: de 70 a 110
+    table = Table(data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#691C32")),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
@@ -1274,30 +1278,28 @@ def tarjeta(resguardatario):
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('FONTSIZE', (0,0), (-1,0), 7),
         ('FONTSIZE', (0,1), (-1,-1), 6.5),
-        ('BACKGROUND', (0,1), (-1,-1), colors.white),  # <-- ESTO ES LO QUE ARREGLA, TODO BLANCO
+        ('BACKGROUND', (0,1), (-1,-1), colors.white),
         ('TEXTCOLOR', (0,1), (-1,-1), colors.black),
         ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f9f9f9")]), # gris muy clarito para rayar
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f9f9f9")]),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('LEFTPADDING', (0,0), (-1,-1), 3),
         ('RIGHTPADDING', (0,0), (-1,-1), 3),
     ]))
 
-    # Dibujar tabla
     tw, th = table.wrap(0,0)
+    # Si la tabla es muy grande, que no se salga de la hoja
+    if h-140-th < 100:
+        th = h-240
     table.drawOn(c, 40, h-140-th)
 
     y_firma = h-160-th-40
-
     c.line(50, y_firma-30, 250, y_firma-30)
     c.drawCentredString(150, y_firma-40, resguardatario)
-    
     c.line(300, y_firma-30, 500, y_firma-30)
     c.drawCentredString(400, y_firma-40, "JEFE DE OFICINA / Vo.Bo.")
-
     c.setFont("Helvetica", 5)
     c.drawCentredString(w/2, y_firma-50, f"Fecha: {datetime.date.today().strftime('%d/%m/%Y')} - Pag 1")
-
     c.showPage()
     c.save()
     buffer.seek(0)
